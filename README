@@ -1,0 +1,24 @@
+
+Summary
+-------
+A JavaScript implementation of the lzo1x codec found in minilzo.c
+http://www.oberhumer.com/opensource/lzo/#minilzo
+
+Syntax
+------
+lzo1x.compress(inputString[, inputEncoding=unicode[, outputEncoding=utf8]]);
+lzo1x.decompress(inputString[, inputEncoding=utf8[, outputEncoding=unicode]]);
+
+Parameters
+----------
+inputString		Either a unicode string or utf8/binary string
+
+inputEncoding	'unicode' / 'utf8' - choose so appropriate conversions can
+				take place
+
+outputEncoding	'unicode' / 'utf8' - choose so appropriate conversions can
+				take place
+
+Returns
+-------
+A unicode string or a binary string depending on parameters.
