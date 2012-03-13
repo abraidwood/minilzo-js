@@ -4,7 +4,7 @@ Summary
 A JavaScript implementation of the lzo1x codec found in minilzo.c
 http://www.oberhumer.com/opensource/lzo/#minilzo
 
-The purpose of the library is primarily fast decompression in the browser.
+	The purpose of the library is primarily fast decompression in the browser.
 
 Syntax
 ------
