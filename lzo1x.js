@@ -203,12 +203,14 @@ var lzo1x = (function () {
 			if (pInBuf[ip] > 17) {
 				t = pInBuf[ip++] - 17;
 				if (t < 4) {
+					// goto match_next
 					outerLoopPos = 2;
 					innerLoopPos = 3;
 				} else {
 					do {
 						out[op++] = pInBuf[ip++];
 					} while (--t > 0);
+					// goto first_literal_run
 					outerLoopPos = 1;
 				}
 			}
@@ -216,6 +218,7 @@ var lzo1x = (function () {
 				if(outerLoopPos === 0) {
 					t = pInBuf[ip++];
 					if (t >= 16) {
+						// goto match
 						outerLoopPos = 2;
 						continue;
 					}
@@ -232,9 +235,10 @@ var lzo1x = (function () {
 						out[op++] = pInBuf[ip++];
 					} while (--t > 0);
 
-					outerLoopPos = 1;
+					outerLoopPos = 1; // fallthru
 				}
 
+				// first literal run
 				if(outerLoopPos === 1) {
 					t = pInBuf[ip++];
 					if (t < 16) {
@@ -246,16 +250,19 @@ var lzo1x = (function () {
 						out[op++] = out[m_pos++];
 						out[op++] = out[m_pos];
 
+						// goto match_done
 						innerLoopPos = 2;
 					}
+					// else fallthru to match
 					outerLoopPos = 2;
 				}
 
+
 				if(outerLoopPos === 2) {
 					outerLoopPos = 0;
-					innerLoopPos = 0;
 
 					do {
+						// match
 						if(innerLoopPos === 0) {
 							if (t >= 64) {
 
@@ -264,6 +271,7 @@ var lzo1x = (function () {
 								m_pos -= pInBuf[ip++] << 3;
 								t = (t >> 5) - 1;
 
+								// goto copy_match
 								innerLoopPos = 1;
 								continue;
 
@@ -279,6 +287,7 @@ var lzo1x = (function () {
 								m_pos = op - 1;
 								m_pos -= (pInBuf[ip] >> 2) + (pInBuf[ip + 1] << 6);
 								ip += 2;
+
 							} else if (t >= 16) {
 								m_pos = op;
 								m_pos -= (t & 8) << 11;
@@ -294,10 +303,12 @@ var lzo1x = (function () {
 								m_pos -= (pInBuf[ip] >> 2) + (pInBuf[ip + 1] << 6);
 								ip += 2;
 								if (m_pos === op) {
+									// eof
 									doOuterLoop = false;
 									break;
 								}
 								m_pos -= 0x4000;
+
 							} else {
 								m_pos = op - 1;
 								m_pos -= t >> 2;
@@ -305,6 +316,7 @@ var lzo1x = (function () {
 								out[op++] = out[m_pos++];
 								out[op++] = out[m_pos];
 
+								// goto match_done
 								innerLoopPos = 2;
 								continue;
 							}
@@ -316,7 +328,7 @@ var lzo1x = (function () {
 							do {
 								out[op++] = out[m_pos++];
 							} while (--t > 0);
-							innerLoopPos = 2;
+							innerLoopPos = 2; // fallthru
 						}
 
 						if(innerLoopPos === 2) {
@@ -324,7 +336,7 @@ var lzo1x = (function () {
 							if (t === 0) {
 								break;
 							}
-							innerLoopPos = 3;
+							innerLoopPos = 3; // fallthru
 						}
 
 						if(innerLoopPos === 3) {
@@ -337,7 +349,7 @@ var lzo1x = (function () {
 								}
 							}
 							t = pInBuf[ip++];
-							innerLoopPos = 0;
+							innerLoopPos = 0; // fallthru to loop start
 						}
 					} while (true);
 				}
@@ -370,11 +382,13 @@ var lzo1x = (function () {
 			ip += ti < 4 ? 4 - ti : 0;
 
 			do {
+				// literal
 				if(loopPos === 0) {
 					ip += 1 + ((ip - ii) >> 5);
-					loopPos = 1;
+					loopPos = 1; // falltrhu
 				}
 
+				// next
 				if(loopPos === 1) {
 					if (ip >= ip_end) {
 						break;
@@ -392,6 +406,7 @@ var lzo1x = (function () {
 					dict[dindex] = ip - ip_s;
 
 					if (dv !== ((((pInBuf[m_pos+3]) ) << 24) | (((pInBuf[m_pos+2]) ) << 16) | (((pInBuf[m_pos+1]) ) << 8) | ((pInBuf[m_pos]) ))) {
+						// goto literal
 						loopPos = 0;
 						continue;
 					}
@@ -430,12 +445,15 @@ var lzo1x = (function () {
 						do {
 							m_len += 1;
 							if (ip + m_len >= ip_end) {
+								// goto m_len_done
 								break;
 							}
 						} while (pInBuf[ip + m_len] === pInBuf[m_pos + m_len]);
 					}
-					loopPos = 2;
+					loopPos = 2; // fallthru
 				}
+
+				// m_len_done
 				if(loopPos === 2) {
 					m_off = ip - m_pos;
 					ip += m_len;
@@ -475,6 +493,7 @@ var lzo1x = (function () {
 						out[op++] = (m_off << 2) & 0xff;
 						out[op++] = (m_off >> 6) & 0xff;
 					}
+					// goto next
 					loopPos = 1;
 				}
 			} while (doLoop);
