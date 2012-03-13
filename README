@@ -11,13 +11,13 @@ lzo1x.decompress(inputString[, inputEncoding=utf8[, outputEncoding=unicode]]);
 
 Parameters
 ----------
-inputString		Either a unicode string or utf8/binary string
+inputString     Either a unicode string or utf8/binary string
 
-inputEncoding	'unicode' / 'utf8' - choose so appropriate conversions can
-				take place
+inputEncoding   'unicode' / 'utf8' - choose so appropriate conversions can
+                take place
 
-outputEncoding	'unicode' / 'utf8' - choose so appropriate conversions can
-				take place
+outputEncoding  'unicode' / 'utf8' - choose so appropriate conversions can
+                take place
 
 Returns
 -------
