@@ -257,9 +257,9 @@ var lzo1x = (function () {
 					outerLoopPos = 2;
 				}
 
-
 				if(outerLoopPos === 2) {
 					outerLoopPos = 0;
+					innerLoopPos = 0; // this is a bug
 
 					do {
 						// match

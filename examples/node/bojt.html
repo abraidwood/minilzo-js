@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+<title>minilzo-js node test page</title>
+</head>
+
+<body>
+
+</body>
+<script src="lzo1x.js" type="text/javascript">></script>
+<script src="bojt.js" type="text/javascript">></script>
+
+<script>
+
+function makeReq(url)
+{
+	var req = new XMLHttpRequest()
+
+	req.open('GET', url, false);
+	req.overrideMimeType('text\/plain; charset=x-user-defined');
+	req.send(null);
+
+	if(!req.status == 200) {}
+
+	return req.responseText;
+}
+
+var response2 = makeReq('http://localhost:1337/data.bojt'),
+	i=0,lim=1000,
+	ts=Date.now(),td,
+	decomp2 = "";
+
+for(i=0;i<lim;i++) {
+	decomp2 = BOJ.unBOJT(response2,lzo1x.decompress,lzo1x.decompress);
+}
+td = (Date.now() - ts) / lim;
+
+document.body.innerHTML += '<br /><br/><h4>BOJ</h4>Decompressed '+response2.length+' bytes to '+decomp2.length+' bytes ('+(decomp2.length*100/response2.length-100).toFixed(2)+'% saving) in '+td+'ms ('+((1000 * decomp2.length) / (td * 1024 * 1024)).toFixed(2)+' MByte/s)' +
+	"<br/><br/>" +
+	decomp2;
+
+</script>
+</html>
