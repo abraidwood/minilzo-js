@@ -1,14 +1,13 @@
 {
-  "name" : "lzo1x node example",
+  "name" : "lzo1x-node-example",
   "description" : "an example using node and minilzo-js",
-  "homepage" : "<a href="https://github.com/abraidwood/minilzo-js</a",
   "keywords" : ["util", "functional", "compression", "client", "browser"],
-"author" : "Alistair Braidwood <<a href="mailto:lzo1x@abraidwood.org"lzo1x@abraidwood.org</a>",
+  "author" : "Alistair Braidwood",
   "contributors" : [],
-  "dependencies" : [
-  	"mini-lzo-wrapper": "0.1.0"
-  ],
+  "dependencies" : {
+  	"mini-lzo-wrapper" : "git://github.com/abraidwood/mini-lzo-wrapper"
+  },
   "repository" : {"type": "git", "url": "git://github.com/abraidwood/minilzo-js.git"},
   "main" : "lzo1x.js",
-  "version" : "0.1"
+  "version" : "0.1.0"
 }
