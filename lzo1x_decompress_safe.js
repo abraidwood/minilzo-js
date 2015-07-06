@@ -79,6 +79,8 @@ function lzo1x_decompress_safe ( state ) {
         // if (op_end - op < t) return OUTPUT_OVERRUN;
         // if (ip_end - ip < t+3) return INPUT_OVERRUN;
 
+        if(op + 3 > cbl) extendBuffer();
+
         out[op++] = buf[ip++];
         if (t > 1) {
             out[op++] = buf[ip++];
