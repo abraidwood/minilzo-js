@@ -79,7 +79,7 @@ function lzo1x_decompress_safe ( state ) {
         // if (op_end - op < t) return OUTPUT_OVERRUN;
         // if (ip_end - ip < t+3) return INPUT_OVERRUN;
 
-        if(op + 3 > cbl) extendBuffer();
+        while(op + 3 > cbl) {extendBuffer();}
 
         out[op++] = buf[ip++];
         if (t > 1) {
@@ -99,7 +99,7 @@ function lzo1x_decompress_safe ( state ) {
 
     function copy_match() {
         t += 2;
-        if(op + t > cbl) extendBuffer();
+        while(op + t > cbl) {extendBuffer();}
         do {
             out[op++] = out[m_pos++];
         } while(--t > 0);
@@ -177,7 +177,7 @@ function lzo1x_decompress_safe ( state ) {
 
                 // if (m_pos < out || m_pos >= op) return LOOKBEHIND_OVERRUN;
                 // if (op_end - op < 2) return OUTPUT_OVERRUN;
-                if(op + 2 > cbl) extendBuffer();
+                while(op + 2 > cbl) {extendBuffer();}
                 out[op++] = out[m_pos++];
                 out[op++] = out[m_pos];
 
@@ -219,7 +219,7 @@ function lzo1x_decompress_safe ( state ) {
         } else {
             // if (op_end - op < t) return OUTPUT_OVERRUN;
             // if (ip_end - ip < t+3) return INPUT_OVERRUN;
-            if(op + t > cbl) extendBuffer();
+            while(op + t > cbl) {extendBuffer();}
             do {
                 out[op++] = buf[ip++];
             } while (--t > 0);
@@ -254,7 +254,7 @@ function lzo1x_decompress_safe ( state ) {
 
             t += 3;
 
-            if(op + t > cbl) extendBuffer();
+            while(op + t > cbl) {extendBuffer();}
             do {
                 out[op++] = buf[ip++];
             } while (--t > 0);
@@ -269,7 +269,7 @@ function lzo1x_decompress_safe ( state ) {
 
             // if ( m_pos <  out || m_pos >= op) return LOOKBEHIND_OVERRUN;
             // if (op_end - op < 3) return OUTPUT_OVERRUN;
-            if(op + 3 > cbl) extendBuffer();
+            while(op + 3 > cbl) {extendBuffer();}
             out[op++] = out[m_pos++];
             out[op++] = out[m_pos++];
             out[op++] = out[m_pos];
