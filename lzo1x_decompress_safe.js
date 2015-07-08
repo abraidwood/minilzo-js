@@ -41,10 +41,16 @@
     exit statuses are not currently implemented
 
 */
+
 function lzo1x_decompress_safe ( state ) {
     var buf = state.inputBuffer;
+    var buf_4b = new Uint8Array(buf.length + (4 - buf.length % 4));
+    buf_4b.set(buf);
+    var buf32 = new Uint32Array(buf_4b.buffer);
+
     var blockSize = 4096;
-    var out = new Uint8Array(Math.ceil(buf.length / blockSize) * blockSize);
+    var out = new Uint8Array(buf.length + (blockSize - buf.length % blockSize));
+    var out32 = new Uint32Array(out.buffer);
     var cbl = out.length;
     state.outputBuffer = out;
     var ip_end = buf.length;
@@ -65,6 +71,7 @@ function lzo1x_decompress_safe ( state ) {
         var newBuffer = new Uint8Array(cbl + blockSize);
         newBuffer.set(out);
         out = newBuffer;
+        out32 = new Uint32Array(out.buffer);
         state.outputBuffer = out;
         cbl = out.length;
     }
@@ -100,9 +107,44 @@ function lzo1x_decompress_safe ( state ) {
     function copy_match() {
         t += 2;
         while(op + t > cbl) {extendBuffer();}
+
+        if(t > 4 && op % 4 === m_pos % 4) {
+            while (op % 4 > 0) {
+                out[op++] = out[m_pos++];
+                t--;
+            }
+
+            while(t > 4) {
+                out32[0|(op/4)] = out32[0|(m_pos/4)];
+                op += 4; m_pos += 4;
+                t -= 4;
+            }
+        }
+
         do {
             out[op++] = out[m_pos++];
         } while(--t > 0);
+    }
+
+    function copy_from_buf() {
+        while(op + t > cbl) {extendBuffer();}
+
+        if(t > 4 && op % 4 === ip % 4) {
+            while (op % 4 > 0) {
+                out[op++] = buf[ip++];
+                t--;
+            }
+
+            while(t > 4) {
+                out32[0|(op/4)] = buf32[0|(ip/4)];
+                op += 4; ip += 4;
+                t -= 4;
+            }
+        }
+
+        do {
+            out[op++] = buf[ip++];
+        } while (--t > 0);
     }
 
     function match() {
@@ -219,10 +261,7 @@ function lzo1x_decompress_safe ( state ) {
         } else {
             // if (op_end - op < t) return OUTPUT_OVERRUN;
             // if (ip_end - ip < t+3) return INPUT_OVERRUN;
-            while(op + t > cbl) {extendBuffer();}
-            do {
-                out[op++] = buf[ip++];
-            } while (--t > 0);
+            copy_from_buf();
             skipToFirstLiteralFun = true;
         }
     }
@@ -253,11 +292,7 @@ function lzo1x_decompress_safe ( state ) {
             // if (ip_end - ip < t+6) return INPUT_OVERRUN;
 
             t += 3;
-
-            while(op + t > cbl) {extendBuffer();}
-            do {
-                out[op++] = buf[ip++];
-            } while (--t > 0);
+            copy_from_buf();
             skipToFirstLiteralFun = false;
         }
 
@@ -290,4 +325,3 @@ function lzo1x_decompress_safe ( state ) {
 
     return OK;
 }
-
