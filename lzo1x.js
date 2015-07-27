@@ -579,6 +579,13 @@ var lzo1x = (function () {
 	return {
 		version: version,
 		compress: _lzo1x.compress(state),
-		decompress: _lzo1x.decompress(state)
+		decompress: _lzo1x.decompress(state),
+		codes: {
+			OK: _lzo1x.OK,
+			INPUT_OVERRUN: _lzo1x.INPUT_OVERRUN,
+			OUTPUT_OVERRUN: _lzo1x.OUTPUT_OVERRUN,
+			LOOKBEHIND_OVERRUN: _lzo1x.LOOKBEHIND_OVERRUN,
+			EOF_FOUND: _lzo1x.EOF_FOUND
+		}
 	};
 })();

@@ -8,22 +8,23 @@ The purpose of the library is primarily fast decompression in the browser.
 
 Syntax
 ------
-lzo1x.compress(inputString[, inputEncoding=unicode[, outputEncoding=utf8]]);
-lzo1x.decompress(inputString[, inputEncoding=utf8[, outputEncoding=unicode]]);
+lzo1x.compress(state);
+lzo1x.decompress(state);
 
 Parameters
 ----------
-inputString     Either a unicode string or utf8/binary string
-
-inputEncoding   'unicode' / 'utf8' - choose so appropriate conversions can
-                take place
-
-outputEncoding  'unicode' / 'utf8' - choose so appropriate conversions can
-                take place
+state: {
+	inputBuffer: <UInt8Array>,
+	outputBuffer: null
+}
 
 Returns
 -------
-A unicode string or a binary string depending on parameters.
+Functions return lzo1x.codes[OK|INPUT_OVERRUN|OUTPUT_OVERRUN|LOOKBEHIND_OVERRUN|EOF_FOUND]
+
+Functions modify state.outputBuffer to contain a UInt8Array containing compressed
+or decompressed data.
+
 
 Defaults
 --------
