@@ -1,10 +1,11 @@
 
 Summary
 -------
-A JavaScript implementation of the lzo1x codec found in minilzo.c
+A JavaScript typed array implementation of the lzo1x codec found in minilzo.c
 http://www.oberhumer.com/opensource/lzo/#minilzo
 
 The purpose of the library is primarily fast decompression in the browser.
+Having said htat, the compression side is also quite fast.
 
 Syntax
 ------
@@ -25,17 +26,13 @@ Functions return lzo1x.codes[OK|INPUT_OVERRUN|OUTPUT_OVERRUN|LOOKBEHIND_OVERRUN|
 Functions modify state.outputBuffer to contain a UInt8Array containing compressed
 or decompressed data.
 
-
-Defaults
---------
-
-Default for compression is unicode in, utf8 out
-Default for decompression is utf8 in, unicode out
-
 Performance
 -----------
-I have achieved >5Mbyte/s decompression in Firefox 10+, Chrome 15+ and Opera
-and >10Mbyte/s decompression in Safari 5.1+ on 3GHz Core2duo OSX 10.6.
+I have achieved 30-40MByte/s decompression and compression in Chrome 44 on my
+2.5GHz i5 (IvyBridge) macbook pro.
 
-For example, the JSON example data http://json.org/example.html compresses
-from 345 bytes to 276 bytes (25%) and decompresses in <50us.
+Testing
+-------
+Although tests are not present in this repo, I have tested compression and decompression
+separately using the output of the compiled minilzo.c (2.09) distribution.  The tests
+ran using ~25,000 files and all passed.
