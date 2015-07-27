@@ -23,16 +23,12 @@ Returns
 -------
 Functions return lzo1x.codes[OK|INPUT_OVERRUN|OUTPUT_OVERRUN|LOOKBEHIND_OVERRUN|EOF_FOUND]
 
-Functions modify state.outputBuffer to contain a UInt8Array containing compressed
-or decompressed data.
+Functions modify state.outputBuffer to contain a UInt8Array containing compressed or decompressed data.
 
 Performance
 -----------
-I have achieved 30-40MByte/s decompression and compression in Chrome 44 on my
-2.5GHz i5 (IvyBridge) macbook pro.
+I have achieved 30-40MByte/s decompression and compression in Chrome 44 on my 2.5GHz i5 (IvyBridge) macbook pro.
 
 Testing
 -------
-Although tests are not present in this repo, I have tested compression and decompression
-separately using the output of the compiled minilzo.c (2.09) distribution.  The tests
-ran using ~25,000 files and all passed.
+Although tests are not present in this repo, I have tested compression and decompression separately using the output of the compiled minilzo.c (2.09) distribution.  The tests ran using ~25,000 files and all passed.
