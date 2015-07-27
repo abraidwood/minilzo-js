@@ -5,7 +5,7 @@ A JavaScript typed array implementation of the lzo1x codec found in minilzo.c
 http://www.oberhumer.com/opensource/lzo/#minilzo
 
 The purpose of the library is primarily fast decompression in the browser.
-Having said htat, the compression side is also quite fast.
+Having said that, the compression side is also quite fast.
 
 Syntax
 ------
