@@ -29,612 +29,556 @@
  */
 
 var lzo1x = (function () {
+	var version = '2.0';
+
 	var _lzo1x = {
-
-		/*!{id:msgpack.js,ver:1.05,license:"MIT",author:"uupaa.js@gmail.com"}*/
-		// === msgpack ===
-		// MessagePack -> http://msgpack.sourceforge.net/
-		// https://github.com/msgpack/msgpack-javascript
-		_bin2num: {},
-		_num2bin: {},
-		_toString: String.fromCharCode,
-
-		init: function () {
-			var i = 0,
-				v;
-
-			for (i = 0; i < 0x100; ++i) {
-				v = this._toString(i);
-				this._bin2num[v] = i; // "\00" -> 0x00
-				this._num2bin[i] = v; //	 0 -> "\00"
-			}
-
-			// http://twitter.com/edvakf/statuses/15576483807
-			for (i = 0x80; i < 0x100; ++i) { // [Webkit][Gecko]
-				this._bin2num[this._toString(0xf700 + i)] = i; // "\f780" -> 0x80
-			}
-		},
-
-		byteStringToByteArray: function (data) { // @param BinaryString: "\00\01"
-									   // @return ByteArray: [0x00, 0x01]
-			var rv = [],
-				bin2num = this._bin2num,
-				remain,
-				ary = data[0] === data.substring(0,1) ? data : data.split(""),
-				i = -1,
-				iz;
-
-			iz = data.length;
-
-			remain = iz % 8;
-			while (remain--) {
-				++i;
-				rv[i] = bin2num[ary[i]];
-			}
-
-			remain = iz >>> 3;
-			while (remain--) {
-				rv.push(
-					bin2num[ary[++i]],
-					bin2num[ary[++i]],
-					bin2num[ary[++i]],
-					bin2num[ary[++i]],
-					bin2num[ary[++i]],
-					bin2num[ary[++i]],
-					bin2num[ary[++i]],
-					bin2num[ary[++i]]
-				);
-			}
-			return rv;
-		},
-
-		byteArrayToByteString: function (byteArray) { // @param ByteArray
-													  // @return String
-			var rv = [],
-				i=0,
-				lim = 1024,
-				iz = byteArray.length,
-				_toString = this._toString,
-				num2bin = this._num2bin;
-
-			try {
-				if(iz <= lim) {
-					return _toString.apply(this, byteArray);
-				}
-				while (iz > 0) {
-					rv.push(_toString.apply(this, byteArray.slice(i, i + Math.min(lim, iz))));
-					iz -= lim;
-					i += lim;
-				}
-				return rv.join("");
-			} catch(e) {; // avoid "Maximum call stack size exceeded"
-			}
-
-			// http://d.hatena.ne.jp/uupaa/20101128
-			try {
-				return _toString.apply(this, byteArray); // toString
-			} catch (err) {; // avoid "Maximum call stack size exceeded"
-			}
-			rv = [];
-			iz = byteArray.length;
-
-			for (i = 0; i < iz; ++i) {
-				rv[i] = num2bin[byteArray[i]];
-			}
-			return rv.join("");
-		},
-
-		/*! end of msgpack.js section */
-
-		unicodeToUTF8ByteArray: function(sInBuf) {// @param String
-												  // @return ByteArray
-			// It would be nice to use:
-			//		unescape(encodeURIComponent(...)));
-			// for string -> utf8, but it's slower
-
-			var i, leni = sInBuf.length,
-				j=0,
-				charCode,
-				pBuf=[];
-
-			for (i = 0; i < leni; i++) {
-				charCode = sInBuf.charCodeAt(i);
-				// unicode => utf-8
-				if (charCode < 0x80) {
-					pBuf[j++] = charCode;
-				} else if (charCode < 0x0800) {
-					pBuf[j++] = 0xc0 | (charCode >>> 6);
-					pBuf[j++] = 0x80 | (charCode & 0x3f);
-				} else {
-					pBuf[j++] = 0xe0 | (charCode >>> 12);
-					pBuf[j++] = 0x80 | ((charCode >>> 6) & 0x3f);
-					pBuf[j++] = 0x80 | (charCode & 0x3f);
-				}
-			}
-			return pBuf;
-		},
-
-		utf8ByteArrayToUnicodeString: function(pInBuf) { // @param ByteArray
-														 // @return String
-			// It would be nice to use:
-			//		decodeURIComponent(escape(...)));
-			// for utf8 -> string, but it's slower
-			var p = pInBuf.length,
-				pOutBuf = [],
-				kBuf,
-				lim = 1024,
-				i=0, j=0, k=0, lenj,
-				c;
-
-			while(p > 0)
-			{
-				kBuf = [];
-				for(j=0, lenj=Math.min(p,lim);j<lenj && p > 0;j++)
-				{
-					c = pInBuf[i++];
-					if (c < 128) {
-						kBuf[j] = c;
-						p--;
-					} else if (c >= 0xe0) {
-						kBuf[j] = ((c & 0x0f) << 12) + ((pInBuf[i++] & 0x3f) << 6) + (pInBuf[i++] & 0x3f);
-						p-=3;
-					} else {// if (c >= 0xc0) {
-						kBuf[j] = ((c & 0x1f) << 6) + (pInBuf[i++] & 0x3f);
-						p-=2;
-					}/* no support for 0xf0, 0xf8 yet*/
-				}
-				pOutBuf[k++] = String.fromCharCode.apply(this, kBuf);
-			}
-			return pOutBuf.join("");
-		},
-
-		decompress: function(pInBuf) { // @param ByteArray
-									   // @return ByteArray
-			var t,
-				out = [],
-				ip = 0,
-				op = 0,
-				ip_end = pInBuf.length,
-				m_pos = 0,
-				outerLoopPos = 0,
-				innerLoopPos = 0,
-				doOuterLoop = true;
-
-			if (pInBuf[ip] > 17) {
-				t = pInBuf[ip++] - 17;
-				if (t < 4) {
-					// goto match_next
-					outerLoopPos = 2;
-					innerLoopPos = 3;
-				} else {
-					do {
-						out[op++] = pInBuf[ip++];
-					} while (--t > 0);
-					// goto first_literal_run
-					outerLoopPos = 1;
-				}
-			}
-			do {
-				if(outerLoopPos === 0) {
-					t = pInBuf[ip++];
-					if (t >= 16) {
-						// goto match
-						outerLoopPos = 2;
-						continue;
-					}
-					if (t === 0) {
-						while (pInBuf[ip] === 0) {
-							t += 255;
-							ip++;
-						}
-						t += 15 + pInBuf[ip++];
-					}
-
-					t += 3;
-					do {
-						out[op++] = pInBuf[ip++];
-					} while (--t > 0);
-
-					outerLoopPos = 1; // fallthru
-				}
-
-				// first literal run
-				if(outerLoopPos === 1) {
-					t = pInBuf[ip++];
-					if (t < 16) {
-						m_pos = op - 0x0801;
-						m_pos -= t >> 2;
-						m_pos -= pInBuf[ip++] << 2;
-
-						out[op++] = out[m_pos++];
-						out[op++] = out[m_pos++];
-						out[op++] = out[m_pos];
-
-						// goto match_done
-						innerLoopPos = 2;
-					}
-					// else fallthru to match
-					outerLoopPos = 2;
-				}
-
-				if(outerLoopPos === 2) {
-					outerLoopPos = 0;
-					innerLoopPos = 0; // this is a bug
-
-					do {
-						// match
-						if(innerLoopPos === 0) {
-							if (t >= 64) {
-
-								m_pos = op - 1;
-								m_pos -= (t >> 2) & 7;
-								m_pos -= pInBuf[ip++] << 3;
-								t = (t >> 5) - 1;
-
-								// goto copy_match
-								innerLoopPos = 1;
-								continue;
-
-							} else if (t >= 32) {
-								t &= 31;
-								if (t === 0) {
-									while (pInBuf[ip] === 0) {
-										t += 255;
-										ip++;
-									}
-									t += 31 + pInBuf[ip++];
-								}
-								m_pos = op - 1;
-								m_pos -= (pInBuf[ip] >> 2) + (pInBuf[ip + 1] << 6);
-								ip += 2;
-
-							} else if (t >= 16) {
-								m_pos = op;
-								m_pos -= (t & 8) << 11;
-								t &= 7;
-								if (t === 0) {
-									while (pInBuf[ip] === 0) {
-										t += 255;
-										ip++;
-									}
-									t += 7 + pInBuf[ip++];
-								}
-
-								m_pos -= (pInBuf[ip] >> 2) + (pInBuf[ip + 1] << 6);
-								ip += 2;
-								if (m_pos === op) {
-									// eof
-									doOuterLoop = false;
-									break;
-								}
-								m_pos -= 0x4000;
-
-							} else {
-								m_pos = op - 1;
-								m_pos -= t >> 2;
-								m_pos -= pInBuf[ip++] << 2;
-								out[op++] = out[m_pos++];
-								out[op++] = out[m_pos];
-
-								// goto match_done
-								innerLoopPos = 2;
-								continue;
-							}
-							innerLoopPos = 1;
-						}
-
-						if(innerLoopPos === 1) {
-							t += 2;
-							do {
-								out[op++] = out[m_pos++];
-							} while (--t > 0);
-							innerLoopPos = 2; // fallthru
-						}
-
-						if(innerLoopPos === 2) {
-							t = pInBuf[ip - 2] & 3;
-							if (t === 0) {
-								break;
-							}
-							innerLoopPos = 3; // fallthru
-						}
-
-						if(innerLoopPos === 3) {
-							out[op++] = pInBuf[ip++];
-							if (t > 1) {
-								out[op++] = pInBuf[ip++];
-
-								if (t > 2) {
-									out[op++] = pInBuf[ip++];
-								}
-							}
-							t = pInBuf[ip++];
-							innerLoopPos = 0; // fallthru to loop start
-						}
-					} while (true);
-				}
-			} while (doOuterLoop);
-
-			return out;
-		},
-
-		dict: [],
-
-		_compressCore: function (pInBuf, ip_s, in_len, op_s, state) {
-			var dict = this.dict,
-				ti = state.t,
-				out = state.out,
-				op = op_s,
-				ip = ip_s,
-
-				in_end = ip_s + in_len,
-				ip_end = in_end - 20,
-				ii = ip,
-
-				loopPos = 0,
-				doLoop = true,
-
-				m_pos = 0,
-				m_off = 0,
-				m_len = 0,
-				dv, dindex, t, tt;
-
-			ip += ti < 4 ? 4 - ti : 0;
-
-			do {
-				// literal
-				if(loopPos === 0) {
-					ip += 1 + ((ip - ii) >> 5);
-					loopPos = 1; // falltrhu
-				}
-
-				// next
-				if(loopPos === 1) {
-					if (ip >= ip_end) {
-						break;
-					}
-					dv = (((pInBuf[ip+3]) ) << 24) | (((pInBuf[ip+2]) ) << 16) | (((pInBuf[ip+1]) ) << 8) | ((pInBuf[ip]) );
-
-					dindex = (0x1824429d * dv) >> 18;
-
-					if (dindex < 0) {
-						dindex += 16384;
-					} else {
-						dindex &= 16383;
-					}
-					m_pos = ip_s + dict[dindex];
-					dict[dindex] = ip - ip_s;
-
-					if (dv !== ((((pInBuf[m_pos+3]) ) << 24) | (((pInBuf[m_pos+2]) ) << 16) | (((pInBuf[m_pos+1]) ) << 8) | ((pInBuf[m_pos]) ))) {
-						// goto literal
-						loopPos = 0;
-						continue;
-					}
-
-					ii -= ti;
-					ti = 0;
-					t = ip - ii;
-
-					if (t !== 0) {
-						if (t <= 3) {
-							out[op - 2] |= t & 0xff;
-							do {
-								out[op++] = pInBuf[ii++];
-							} while (--t > 0);
-						} else {
-							if (t <= 18) {
-								out[op++] = (t - 3) & 0xff;
-							} else {
-								tt = t - 18;
-								out[op++] = 0;
-								while (tt > 255) {
-									tt -= 255;
-									out[op++] = 0;
-								}
-								out[op++] = tt & 0xff;
-							}
-							do {
-								out[op++] = pInBuf[ii++];
-							} while (--t > 0);
-						}
-					}
-
-					m_len = 4;
-
-					if (pInBuf[ip + m_len] === pInBuf[m_pos + m_len]) {
-						do {
-							m_len += 1;
-							if (ip + m_len >= ip_end) {
-								// goto m_len_done
-								break;
-							}
-						} while (pInBuf[ip + m_len] === pInBuf[m_pos + m_len]);
-					}
-					loopPos = 2; // fallthru
-				}
-
-				// m_len_done
-				if(loopPos === 2) {
-					m_off = ip - m_pos;
-					ip += m_len;
-					ii = ip;
-					if (m_len <= 8 && m_off <= 0x0800) {
-						m_off -= 1;
-						out[op++] = (((m_len - 1) << 5) | ((m_off & 7) << 2));
-						out[op++] = (m_off >> 3) & 0xff;
-					} else if (m_off <= 0x4000) {
-						m_off -= 1;
-						if (m_len <= 33) {
-							out[op++] = (32 | (m_len - 2)) & 0xff;
-						} else {
-							m_len -= 33;
-							out[op++] = 32;
-							while (m_len > 255) {
-								m_len -= 255;
-								out[op++] = 0;
-							}
-							out[op++] = m_len & 0xff;
-						}
-						out[op++] = (m_off << 2) & 0xff;
-						out[op++] = (m_off >> 6) & 0xff;
-					} else {
-						m_off -= 0x4000;
-						if (m_len <= 9) {
-							out[op++] = (16 | ((m_off >> 11) & 8) | (m_len - 2)) & 0xff;
-						} else {
-							m_len -= 9;
-							out[op++] = (16 | ((m_off >> 11) & 8)) & 0xff;
-							while (m_len > 255) {
-								m_len -= 255;
-								out[op++] = 0;
-							}
-							out[op++] = m_len & 0xff;
-						}
-						out[op++] = (m_off << 2) & 0xff;
-						out[op++] = (m_off >> 6) & 0xff;
-					}
-					// goto next
-					loopPos = 1;
-				}
-			} while (doLoop);
-
-			return {
-				t: in_end - (ii - ti),
-				out_len: op - op_s,
-				out: out
-			};
-
-		},
-
-		compress: function (pInBuf) { // @param ByteArray
-									  // @return ByteArray
-			pInBuf.push(0);
-
-			var in_s = 0,
-				out_s = 0,
-				ip = 0,
-				op = 0,
-				in_len = pInBuf.length,
-				l = in_len,
-				t = 0,
-				ll, ll_end, dict = this.dict, dicti, state = {
-					t: 0,
-					out: [],
-					out_len: 0
-				},
-				out, tt, ii;
-
-			out = state.out;
-
-			while (l > 20) {
-				if(l>49152) {
-					ll = 49152;
-				} else {
-					ll = l;
-				}
-				ll_end = ip + ll;
-				if ((t + ll) >> 5 <= 0) {
-					break;
-				}
-
-				dicti = 16384;
-				while (dicti--) {
-					dict[dicti] = 0;
-				}
-
-				state = this._compressCore(pInBuf, ip, ll, op, state);
-				t = state.t;
-				ip += ll;
-				op += state.out_len;
-
-				l -= ll;
-			}
-			t += l;
-			if (t > 0) {
-				ii = in_s + in_len - t;
-				if (op === out_s && t <= 238) {
-					out[op++] = (17 + t) & 0xff;
-				} else if (t <= 3) {
-					out[op - 2] |= t & 0xff;
-				} else if (t <= 18) {
-					out[op++] = (t - 3) & 0xff;
-				} else {
-					tt = t - 18;
-					out[op++] = 0;
-					while (tt > 255) {
-						tt -= 255;
-						out[op++] = 0;
-					}
-					out[op++] = tt & 0xff;
-				}
-				do {
-					out[op++] = pInBuf[ii++];
-				} while (--t > 0);
-			}
-
-			out[op++] = 17;
-			out[op++] = 0;
-			out[op++] = 0;
-
-			return out;
-		}
+		blockSize: 4096,
+
+		OK: 0,
+		INPUT_OVERRUN: -4,
+		OUTPUT_OVERRUN: -5,
+		LOOKBEHIND_OVERRUN: -6,
+		EOF_FOUND: -999,
+
+		buf: null,
+		buf32: null,
+
+		out: null,
+		out32: null,
+		cbl: 0,
+		ip_end: 0,
+		op_end: 0,
+		t: 0,
+
+		ip: 0,
+		op: 0,
+		m_pos: 0,
+
+		skipToFirstLiteralFun: false,
+
+		ctzl: function(v) {
+			// this might be needed for _compressCore (it isn't in my current test files)
+	        /*
+	         * https://graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightBinSearch
+	         * Matt Whitlock suggested this on January 25, 2006. Andrew Shapira shaved a couple operations off on Sept. 5, 2007 (by setting c=1 and unconditionally subtracting at the end).
+	         */
+
+	        var c;     // c will be the number of zero bits on the right,
+	        // so if v is 1101000 (base 2), then c will be 3
+	        // NOTE: if 0 == v, then c = 31.
+	        if (v & 0x1) {
+	            // special case for odd v (assumed to happen half of the time)
+	            c = 0;
+	        } else {
+	            c = 1;
+	            if ((v & 0xffff) === 0) {
+	                v >>= 16;
+	                c += 16;
+	            }
+	            if ((v & 0xff) === 0) {
+	                v >>= 8;
+	                c += 8;
+	            }
+	            if ((v & 0xf) === 0) {
+	                v >>= 4;
+	                c += 4;
+	            }
+	            if ((v & 0x3) === 0) {
+	                v >>= 2;
+	                c += 2;
+	            }
+	            c -= v & 0x1;
+	        }
+	        return c;
+	    },
+
+	    extendBuffer: function() {
+	        var newBuffer = new Uint8Array(this.cbl + this.blockSize);
+	        newBuffer.set(this.out);
+	        this.out = newBuffer;
+	        this.out32 = new Uint32Array(this.out.buffer);
+	        this.state.outputBuffer = this.out;
+	        this.cbl = this.out.length;
+	    },
+
+
+	    eof_found: function() {
+	        // *out_len = ((lzo_uint) ((op)-(out)));
+	        return (this.ip === this.ip_end ? 0 : (this.ip < this.ip_end ? -8 : -4));
+	    },
+
+	    match_next: function() {
+	        // if (op_end - op < t) return OUTPUT_OVERRUN;
+	        // if (ip_end - ip < t+3) return INPUT_OVERRUN;
+
+	        while(this.op + 3 > this.cbl) {this.extendBuffer();}
+
+	        this.out[this.op++] = this.buf[this.ip++];
+	        if (this.t > 1) {
+	            this.out[this.op++] = this.buf[this.ip++];
+	            if (this.t > 2) {
+	                this.out[this.op++] = this.buf[this.ip++];
+	            }
+	        }
+
+	        this.t = this.buf[this.ip++];
+	    },
+
+	    match_done: function() {
+	        this.t = this.buf[this.ip-2] & 3;
+	        return this.t;
+	    },
+
+	    copy_match: function() {
+	        this.t += 2;
+	        while(this.op + this.t > this.cbl) {this.extendBuffer();}
+
+	        if(this.t > 4 && this.op % 4 === this.m_pos % 4) {
+	            while (this.op % 4 > 0) {
+	                this.out[this.op++] = this.out[this.m_pos++];
+	                this.t--;
+	            }
+
+	            while(this.t > 4) {
+	                this.out32[0|(this.op/4)] = this.out32[0|(this.m_pos/4)];
+	                this.op += 4; this.m_pos += 4;
+	                this.t -= 4;
+	            }
+	        }
+
+	        do {
+	            this.out[this.op++] = this.out[this.m_pos++];
+	        } while(--this.t > 0);
+	    },
+
+	    copy_from_buf: function() {
+	        while(this.op + this.t > this.cbl) {this.extendBuffer();}
+
+	        if(this.t > 4 && this.op % 4 === this.ip % 4) {
+	            while (this.op % 4 > 0) {
+	                this.out[this.op++] = this.buf[this.ip++];
+	                this.t--;
+	            }
+
+	            while(this.t > 4) {
+	                this.out32[0|(this.op/4)] = this.buf32[0|(this.ip/4)];
+	                this.op += 4; this.ip += 4;
+	                this.t -= 4;
+	            }
+	        }
+
+	        do {
+	            this.out[this.op++] = this.buf[this.ip++];
+	        } while (--this.t > 0);
+	    },
+
+	    match: function() {
+	        for (;;) {
+	            if (this.t >= 64) {
+
+	                this.m_pos = this.op - 1;
+	                this.m_pos -= (this.t >> 2) & 7;
+	                this.m_pos -= this.buf[this.ip++] << 3;
+	                this.t = (this.t >> 5) - 1;
+
+	                // if ( m_pos < out || m_pos >= op) return LOOKBEHIND_OVERRUN;
+	                // if (op_end - op < t+3-1) return OUTPUT_OVERRUN;
+
+	                this.copy_match();
+
+	                if(this.match_done() === 0) {
+	                    break;
+	                } else {
+	                    this.match_next();
+	                    continue;
+	                }
+
+	            } else if (this.t >= 32) {
+	                this.t &= 31;
+	                if (this.t === 0) {
+	                    while (this.buf[this.ip] === 0) {
+	                        this.t += 255;
+	                        this.ip++;
+	                        // if (t > -511) return OUTPUT_OVERRUN;
+	                        // if (ip_end - ip < 1) return INPUT_OVERRUN;
+	                    }
+	                    this.t += 31 + this.buf[this.ip++];
+	                    // if (ip_end - ip < 2) return INPUT_OVERRUN;
+	                }
+
+	                this.m_pos = this.op - 1;
+	                this.m_pos -= (this.buf[this.ip] >> 2) + (this.buf[this.ip + 1] << 6);
+
+	                this.ip += 2;
+
+	            } else if (this.t >= 16) {
+	                this.m_pos = this.op;
+	                this.m_pos -= (this.t & 8) << 11;
+
+	                this.t &= 7;
+	                if (this.t === 0) {
+	                    while (this.buf[this.ip] === 0) {
+	                        this.t += 255;
+	                        this.ip++;
+	                        // if (t > -511) return OUTPUT_OVERRUN;
+	                        // if (ip_end - ip < 1) return INPUT_OVERRUN;
+	                    }
+	                    this.t += 7 + this.buf[this.ip++];
+	                    // if (ip_end - ip < 2) return INPUT_OVERRUN;
+	                }
+
+	                this.m_pos -= (this.buf[this.ip] >> 2) + (this.buf[this.ip + 1] << 6);
+
+	                this.ip += 2;
+	                if (this.m_pos === this.op) {
+	                    this.state.outputBuffer = this.state.outputBuffer.subarray(0, this.op);
+	                    return this.EOF_FOUND;
+	                }
+	                this.m_pos -= 0x4000;
+
+	            } else {
+	                this.m_pos = this.op - 1;
+	                this.m_pos -= this.t >> 2;
+	                this.m_pos -= this.buf[this.ip++] << 2;
+
+	                // if (m_pos < out || m_pos >= op) return LOOKBEHIND_OVERRUN;
+	                // if (op_end - op < 2) return OUTPUT_OVERRUN;
+	                while(this.op + 2 > this.cbl) {this.extendBuffer();}
+	                this.out[this.op++] = this.out[this.m_pos++];
+	                this.out[this.op++] = this.out[this.m_pos];
+
+	                if(this.match_done() === 0) {
+	                    break;
+	                } else {
+	                    this.match_next();
+	                    continue;
+	                }
+	            }
+
+	            // if (m_pos < out || m_pos >= op) return LOOKBEHIND_OVERRUN;
+	            // if (op_end - op < t+3-1) return OUTPUT_OVERRUN;
+
+	            this.copy_match();
+
+	            if(this.match_done() === 0) {
+	                break;
+	            }
+
+	            this.match_next();
+	        }
+
+	        return this.OK;
+	    },
+
+	    decompress: function(state) {
+	        this.state = state;
+
+	        this.buf = this.state.inputBuffer;
+	        var buf_4b = new Uint8Array(this.buf.length + (4 - this.buf.length % 4));
+	        buf_4b.set(this.buf);
+	        this.buf32 = new Uint32Array(buf_4b.buffer);
+
+	        this.out = new Uint8Array(this.buf.length + (this.blockSize - this.buf.length % this.blockSize));
+	        this.out32 = new Uint32Array(this.out.buffer);
+	        this.cbl = this.out.length;
+	        this.state.outputBuffer = this.out;
+	        this.ip_end = this.buf.length;
+	        this.op_end = this.out.length;
+	        this.t = 0;
+
+	        this.ip = 0;
+	        this.op = 0;
+	        this.m_pos = 0;
+
+	        this.skipToFirstLiteralFun = false;
+
+	        // if (ip_end - ip < 1) return INPUT_OVERRUN;
+	        if (this.buf[this.ip] > 17) {
+	            this.t = this.buf[this.ip++] - 17;
+	            if (this.t < 4) {
+	                this.match_next();
+	                ret = this.match();
+	                if(ret !== this.OK) {
+	                    return ret === this.EOF_FOUND ? this.OK : ret;
+	                }
+
+	            } else {
+	                // if (op_end - op < t) return OUTPUT_OVERRUN;
+	                // if (ip_end - ip < t+3) return INPUT_OVERRUN;
+	                this.copy_from_buf();
+	                this.skipToFirstLiteralFun = true;
+	            }
+	        }
+
+	        for (;;) {
+	            if(!this.skipToFirstLiteralFun) {
+	                // if (ip_end - ip < 3) return INPUT_OVERRUN;
+	                this.t = this.buf[this.ip++];
+
+	                if (this.t >= 16) {
+	                    ret = this.match();
+	                    if(ret !== this.OK) {
+	                        return ret === this.EOF_FOUND ? this.OK : ret;
+	                    }
+	                    continue;
+	                }
+
+	                if (this.t === 0) {
+	                    while (this.buf[this.ip] === 0) {
+	                        this.t += 255;
+	                        this.ip++;
+	                        // if (t > 511) return INPUT_OVERRUN;
+	                        // if (ip_end - ip < 1) return INPUT_OVERRUN;
+	                    }
+	                    this.t += 15 + this.buf[this.ip++];
+	                }
+	                // if (op_end - op < t+3) return OUTPUT_OVERRUN;
+	                // if (ip_end - ip < t+6) return INPUT_OVERRUN;
+
+	                this.t += 3;
+	                this.copy_from_buf();
+	                this.skipToFirstLiteralFun = false;
+	            }
+
+	            this.t = this.buf[this.ip++];
+	            if (this.t < 16) {
+	                this.m_pos = this.op - (1 + 0x0800);
+	                this.m_pos -= this.t >> 2;
+	                this.m_pos -= this.buf[this.ip++] << 2;
+
+	                // if ( m_pos <  out || m_pos >= op) return LOOKBEHIND_OVERRUN;
+	                // if (op_end - op < 3) return OUTPUT_OVERRUN;
+	                while(this.op + 3 > this.cbl) {this.extendBuffer();}
+	                this.out[this.op++] = this.out[this.m_pos++];
+	                this.out[this.op++] = this.out[this.m_pos++];
+	                this.out[this.op++] = this.out[this.m_pos];
+
+	                if(this.match_done() === 0) {
+	                    break;
+	                } else {
+	                    this.match_next();
+	                    continue;
+	                }
+	            }
+
+	            ret = this.match();
+	            if(ret !== this.OK) {
+	                return ret === this.EOF_FOUND ? this.OK : ret;
+	            }
+	        }
+
+	        return this.OK;
+	    },
+
+	    _compressCore: function(in_len, ti) {
+	        var ip_start = this.ip;
+	        var ip_end = this.ip + in_len - 20;
+	        var ii = this.ip;
+
+	        this.ip += ti < 4 ? 4 - ti : 0;
+
+	        var m_pos = 0;
+	        var m_off = 0;
+	        var m_len = 0;
+	        var dv_hi = 0;
+	        var dv_lo = 0;
+	        var dindex = 0;
+
+
+	        this.ip += 1 + ((this.ip - ii) >> 5);
+
+	        for (;;) {
+	            if(this.ip >= ip_end) {
+	                break;
+	            }
+
+	            // dv = this.buf[this.ip] | (this.buf[this.ip + 1] << 8) | (this.buf[this.ip + 2] << 16) | (this.buf[this.ip + 3] << 24);
+	            // dindex = ((0x1824429d * dv) >> 18) & 16383;
+	            // The above code doesn't work in JavaScript due to a lack of 64 bit bitwise operations
+	            // Instead, use (optimised two's complement integer arithmetic)
+	            // Optimization is based on us only needing the high 16 bits of the lower 32 bit integer.
+	            dv_lo = this.buf[this.ip] | (this.buf[this.ip + 1] << 8);
+	            dv_hi = this.buf[this.ip + 2] | (this.buf[this.ip + 3] << 8);
+	            dindex = (((dv_lo * 0x429d) >>> 16) + (dv_hi * 0x429d) + (dv_lo  * 0x1824) & 0xFFFF) >>> 2;
+
+	            m_pos = ip_start + this.dict[dindex];
+
+	            this.dict[dindex] = this.ip - ip_start;
+	            if ((dv_hi<<16) + dv_lo != (this.buf[m_pos] | (this.buf[m_pos + 1] << 8) | (this.buf[m_pos + 2] << 16) | (this.buf[m_pos + 3] << 24))) {
+	                this.ip += 1 + ((this.ip - ii) >> 5);
+	                continue;
+	            }
+	            ii -= ti;
+	            ti = 0;
+	            var t = this.ip - ii;
+
+	            if (t !== 0) {
+	                if (t <= 3) {
+	                    this.out[this.op - 2] |= t;
+	                    do {
+	                        this.out[this.op++] = this.buf[ii++];
+	                    } while (--t > 0);
+
+	                } else {
+	                    if (t <= 18) {
+	                        this.out[this.op++] = t - 3;
+
+	                    } else {
+	                        var tt = t - 18;
+	                        this.out[this.op++] = 0;
+	                        while (tt > 255) {
+	                            tt -= 255;
+	                            this.out[this.op++] = 0;
+	                        }
+	                        this.out[this.op++] = tt;
+	                    }
+
+	                    do {
+	                        this.out[this.op++] = this.buf[ii++];
+	                    } while (--t > 0);
+	                }
+	            }
+
+	            m_len = 4;
+
+	            // var skipTo_m_len_done = false;
+	            if (this.buf[this.ip + m_len] === this.buf[m_pos + m_len]) {
+	                do {
+	                    m_len += 1; if(this.buf[this.ip + m_len] !==  this.buf[m_pos + m_len]) {break;}
+	                    m_len += 1; if(this.buf[this.ip + m_len] !==  this.buf[m_pos + m_len]) {break;}
+	                    m_len += 1; if(this.buf[this.ip + m_len] !==  this.buf[m_pos + m_len]) {break;}
+	                    m_len += 1; if(this.buf[this.ip + m_len] !==  this.buf[m_pos + m_len]) {break;}
+	                    m_len += 1; if(this.buf[this.ip + m_len] !==  this.buf[m_pos + m_len]) {break;}
+	                    m_len += 1; if(this.buf[this.ip + m_len] !==  this.buf[m_pos + m_len]) {break;}
+	                    m_len += 1; if(this.buf[this.ip + m_len] !==  this.buf[m_pos + m_len]) {break;}
+	                    m_len += 1; if(this.buf[this.ip + m_len] !==  this.buf[m_pos + m_len]) {break;}
+	                    if(this.ip + m_len >= ip_end) {
+	                        // skipTo_m_len_done = true;
+	                        break;
+	                    }
+	                } while (this.buf[this.ip + m_len] ===  this.buf[m_pos + m_len]);
+	            }
+
+	            // if (!skipTo_m_len_done) {
+	            //     var inc = this.ctzl(this.buf[this.ip + m_len] ^ this.buf[m_pos + m_len]) >> 3;
+	            //     m_len += inc;
+	            // }
+
+	            m_off = this.ip - m_pos;
+	            this.ip += m_len;
+	            ii = this.ip;
+	            if (m_len <= 8 && m_off <= 0x0800) {
+
+	                m_off -= 1;
+
+	                this.out[this.op++] = ((m_len - 1) << 5) | ((m_off & 7) << 2);
+	                this.out[this.op++] = m_off >> 3;
+
+	            } else if (m_off <= 0x4000) {
+	                m_off -= 1;
+	                if (m_len <= 33) {
+	                    this.out[this.op++] = 32 | (m_len - 2);
+
+	                } else {
+	                    m_len -= 33;
+	                    this.out[this.op++] = 32;
+	                    while (m_len > 255) {
+	                        m_len -= 255;
+	                        this.out[this.op++] = 0;
+	                    }
+	                    this.out[this.op++] = m_len;
+	                }
+	                this.out[this.op++] = m_off << 2;
+	                this.out[this.op++] = m_off >> 6;
+	            } else {
+	                m_off -= 0x4000;
+	                if (m_len <= 9) {
+	                    this.out[this.op++] = 16 | ((m_off >> 11) & 8) | (m_len - 2);
+
+	                } else {
+	                    m_len -= 9;
+	                    this.out[this.op++] = 16 | ((m_off >> 11) & 8);
+
+	                    while (m_len > 255) {
+	                        m_len -= 255;
+	                        this.out[this.op++] = 0;
+	                    }
+	                    this.out[this.op++] = m_len;
+	                }
+	                this.out[this.op++] = m_off << 2;
+	                this.out[this.op++] = m_off >> 6;
+	            }
+	        }
+	        return in_len - ((ii - ip_start) - ti);
+	    },
+
+	    compress: function (state) {
+	        this.state = state;
+	        this.ip = 0;
+	        this.buf = this.state.inputBuffer;
+	        var in_len = this.buf.length;
+	        var max_len = in_len + Math.ceil(in_len / 16) + 64 + 3;
+	        this.state.outputBuffer = new Uint8Array(max_len);
+	        this.out = this.state.outputBuffer;
+	        this.op = 0;
+	        this.dict = new Uint32Array(16384);
+	        var l = in_len;
+	        var t = 0;
+
+	        while (l > 20) {
+	            var ll = (l <= 49152) ? l : 49152;
+	            if ((t + ll) >> 5 <= 0) {
+	                break;
+	            }
+
+	            this.dict = new Uint32Array(16384);
+
+	            var prev_ip = this.ip;
+	            t = this._compressCore(ll,t);
+	            this.ip = prev_ip + ll;
+	            l -= ll;
+	        }
+	        t += l;
+
+	        if (t > 0) {
+	            var ii = in_len - t;
+
+	            if (this.op === 0 && t <= 238) {
+	                this.out[this.op++] = 17 + t;
+
+	            } else if (t <= 3) {
+	                this.out[this.op-2] |= t;
+
+	            } else if (t <= 18) {
+	                this.out[this.op++] = t - 3;
+
+	            } else {
+	                tt = t - 18;
+	                this.out[this.op++] = 0;
+	                while (tt > 255) {
+	                    tt -= 255;
+	                    this.out[this.op++] = 0;
+	                }
+	                this.out[this.op++] = tt;
+	            }
+
+	            do {
+	                this.out[this.op++] = this.buf[ii++];
+	            } while (--t > 0);
+	        }
+
+	        this.out[this.op++] = 17;
+	        this.out[this.op++] = 0;
+	        this.out[this.op++] = 0;
+
+	        this.state.outputBuffer = this.out.subarray(0, this.op);
+	        return 0;
+	    }
 	};
-	_lzo1x.init();
 
 	return {
-		compress: function (s,sInputEncoding,sOutputEncoding) {
-			sInputEncoding || (sInputEncoding = "unicode");
-			sOutputEncoding || (sOutputEncoding = "utf8");
-
-			if(sInputEncoding === "unicode") {
-				s = _lzo1x.unicodeToUTF8ByteArray(s);
-			} else {
-				s = _lzo1x.byteStringToByteArray(s);
-			}
-
-			s = _lzo1x.compress(s);
-
-			if(sOutputEncoding === "unicode") {
-				return _lzo1x.utf8ByteArrayToUnicodeString(s);
-			} else {
-				return _lzo1x.byteArrayToByteString(s);
-			}
-		},
-		decompress: function (s,sInputEncoding,sOutputEncoding) {
-			sInputEncoding || (sInputEncoding = "utf8");
-			sOutputEncoding || (sOutputEncoding = "unicode");
-
-			if(sInputEncoding === "unicode") {
-				s = _lzo1x.unicodeToUTF8ByteArray(s);
-			} else {
-				var i,leni=s.length,
-					p = [];
-
-				for(i=0;i<leni;i++) {
-					p[i] = s.charCodeAt(i) & 0xff;
-				}
-				s = p;
-			}
-
-			s = _lzo1x.decompress(s);
-
-			if(sOutputEncoding === "unicode") {
-				return _lzo1x.utf8ByteArrayToUnicodeString(s);
-			} else {
-				return _lzo1x.byteArrayToByteString(s);
-			}
-		},
-		byteStringToByteArray: function (s) {
-			return _lzo1x.byteStringToByteArray(s);
-		},
-		byteArrayToByteString: function (s) {
-			return _lzo1x.byteArrayToByteString(s);
-		},
-		unicodeToUTF8ByteArray: function(s) {
-			return _lzo1x.unicodeToUTF8ByteArray(s);
-		},
-		utf8ByteArrayToUnicodeString: function(s) {
-			return _lzo1x.utf8ByteArrayToUnicodeString(s);
-		}
+		version: version,
+		compress: _lzo1x.compress(state),
+		decompress: _lzo1x.decompress(state)
 	};
 })();
