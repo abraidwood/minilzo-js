@@ -57,6 +57,7 @@ var lzo1x = (function () {
 		m_len: 0,
 
 		skipToFirstLiteralFun: false,
+		_bytesToCopy: 0,
 
 		ctzl: function(v) {
 			// this might be needed for _compressCore (it isn't in my current test files)
@@ -185,23 +186,23 @@ var lzo1x = (function () {
 	        } while (--this.t > 0);
 	    },
 
-	    comp_copy_from_buf: function(t) {
-	        if(t > 4 && this.op % 4 === this.ii % 4) {
+	    comp_copy_from_buf: function() {
+	        if(this._bytesToCopy > 4 && this.op % 4 === this.ii % 4) {
 	            while (this.op % 4 > 0) {
 	                this.out[this.op++] = this.buf[this.ii++];
-	                t--;
+	                this._bytesToCopy--;
 	            }
 
-	            while(t > 4) {
+	            while(this._bytesToCopy > 4) {
 	                this.out32[0|(this.op/4)] = this.buf32[0|(this.ii/4)];
 	                this.op += 4; this.ii += 4;
-	                t -= 4;
+	                this._bytesToCopy -= 4;
 	            }
 	        }
 
 	        do {
 	            this.out[this.op++] = this.buf[this.ii++];
-	        } while (--t > 0);
+	        } while (--this._bytesToCopy > 0);
 	    },
 
 	    match: function() {
@@ -426,7 +427,8 @@ var lzo1x = (function () {
 
             if (t <= 3) {
                 this.out[this.op - 2] |= t;
-                this.comp_copy_from_buf(t);
+                this._bytesToCopy = t;
+                this.comp_copy_from_buf();
 
             } else {
                 if (t <= 18) {
@@ -442,7 +444,8 @@ var lzo1x = (function () {
                     this.out[this.op++] = tt;
                 }
 
-                this.comp_copy_from_buf(t);
+                this._bytesToCopy = t;
+                this.comp_copy_from_buf();
             }
 	    },
 
@@ -523,17 +526,12 @@ var lzo1x = (function () {
 	        var ip_end = this.ip + in_len - 20;
 	        this.ii = this.ip;
 
-	        this.ip += ((ti < 4) ? (4 - ti) : 0);
-	        this.ip += 1 + ((this.ip - this.ii) >> 5);
+	        this.ip += 1;
 
 	        for (;;) {
-	            if(this.ip >= ip_end) {
-	                break;
-	            }
+	            if(this.ip >= ip_end) {break;}
 
-	            if(this._doDictionaryCalcs() !== this.OK) {
-	            	continue;
-	            }
+	            if(this._doDictionaryCalcs() !== this.OK) {continue;}
 
 	            this.ii -= ti;
 
@@ -542,10 +540,10 @@ var lzo1x = (function () {
 		        }
 
 	            this._recalc_m_len();
-
 	            this._finishCompressCore();
 	        }
-	        return in_len - ((this.ii - ip_start));
+
+	        return in_len - (this.ii - ip_start);
 	    },
 
 	    _compressRemainder: function(t) {
@@ -566,7 +564,8 @@ var lzo1x = (function () {
                 this._zeroFill(tt);
             }
 
-            this.comp_copy_from_buf(t);
+            this._bytesToCopy = t;
+            this.comp_copy_from_buf();
 	    },
 
 	    compress: function (state) {
