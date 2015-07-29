@@ -94,6 +94,17 @@ var lzo1x = (function () {
 	        return c;
 	    },
 
+	    _get4ByteAlignedBuf: function(buf) {
+	    	if(buf.length % 4 === 0) {
+	    		return new Uint32Array(buf.buffer);
+
+			} else {
+				var buf_4b = new Uint8Array(buf.length + (4 - buf.length % 4));
+				buf_4b.set(buf);
+				return new Uint32Array(buf_4b.buffer);
+			}
+	    },
+
 	    extendBuffer: function() {
 	        var newBuffer = new Uint8Array(this.cbl + this.blockSize);
 	        newBuffer.set(this.out);
@@ -153,7 +164,7 @@ var lzo1x = (function () {
 	        } while(--this.t > 0);
 	    },
 
-	    copy_from_buf: function() {
+	    decomp_copy_from_buf: function() {
 	        while(this.op + this.t > this.cbl) {this.extendBuffer();}
 
 	        if(this.t > 4 && this.op % 4 === this.ip % 4) {
@@ -172,6 +183,25 @@ var lzo1x = (function () {
 	        do {
 	            this.out[this.op++] = this.buf[this.ip++];
 	        } while (--this.t > 0);
+	    },
+
+	    comp_copy_from_buf: function(t) {
+	        if(t > 4 && this.op % 4 === this.ii % 4) {
+	            while (this.op % 4 > 0) {
+	                this.out[this.op++] = this.buf[this.ii++];
+	                t--;
+	            }
+
+	            while(t > 4) {
+	                this.out32[0|(this.op/4)] = this.buf32[0|(this.ii/4)];
+	                this.op += 4; this.ii += 4;
+	                t -= 4;
+	            }
+	        }
+
+	        do {
+	            this.out[this.op++] = this.buf[this.ii++];
+	        } while (--t > 0);
 	    },
 
 	    match: function() {
@@ -276,9 +306,7 @@ var lzo1x = (function () {
 	        this.state = state;
 
 	        this.buf = this.state.inputBuffer;
-	        var buf_4b = new Uint8Array(this.buf.length + (4 - this.buf.length % 4));
-	        buf_4b.set(this.buf);
-	        this.buf32 = new Uint32Array(buf_4b.buffer);
+			this.buf32 = this._get4ByteAlignedBuf(this.buf);
 
 	        this.out = new Uint8Array(this.buf.length + (this.blockSize - this.buf.length % this.blockSize));
 	        this.out32 = new Uint32Array(this.out.buffer);
@@ -307,7 +335,7 @@ var lzo1x = (function () {
 	            } else {
 	                // if (op_end - op < t) return OUTPUT_OVERRUN;
 	                // if (ip_end - ip < t+3) return INPUT_OVERRUN;
-	                this.copy_from_buf();
+	                this.decomp_copy_from_buf();
 	                this.skipToFirstLiteralFun = true;
 	            }
 	        }
@@ -338,7 +366,7 @@ var lzo1x = (function () {
 	                // if (ip_end - ip < t+6) return INPUT_OVERRUN;
 
 	                this.t += 3;
-	                this.copy_from_buf();
+	                this.decomp_copy_from_buf();
 	                this.skipToFirstLiteralFun = false;
 	            }
 
@@ -398,9 +426,7 @@ var lzo1x = (function () {
 
             if (t <= 3) {
                 this.out[this.op - 2] |= t;
-                do {
-                    this.out[this.op++] = this.buf[this.ii++];
-                } while (--t > 0);
+                this.comp_copy_from_buf(t);
 
             } else {
                 if (t <= 18) {
@@ -416,9 +442,7 @@ var lzo1x = (function () {
                     this.out[this.op++] = tt;
                 }
 
-                do {
-                    this.out[this.op++] = this.buf[this.ii++];
-                } while (--t > 0);
+                this.comp_copy_from_buf(t);
             }
 	    },
 
@@ -449,12 +473,12 @@ var lzo1x = (function () {
             // }
 	    },
 
-	    _zeroFill: function() {
-			while (this.m_len > 255) {
-                this.m_len -= 255;
+	    _zeroFill: function(n) {
+			while (n > 255) {
+                n -= 255;
                 this.out[this.op++] = 0;
             }
-            this.out[this.op++] = this.m_len;
+            this.out[this.op++] = n;
 	    },
 
 	    _finishCompressCore: function() {
@@ -474,7 +498,7 @@ var lzo1x = (function () {
                 } else {
                     this.m_len -= 33;
                     this.out[this.op++] = 32;
-                    this._zeroFill();
+                    this._zeroFill(this.m_len);
                 }
                 this.out[this.op++] = m_off << 2;
                 this.out[this.op++] = m_off >> 6;
@@ -487,7 +511,7 @@ var lzo1x = (function () {
                 } else {
                     this.m_len -= 9;
                     this.out[this.op++] = 16 | ((m_off >> 11) & 8);
-                    this._zeroFill();
+                    this._zeroFill(this.m_len);
                 }
                 this.out[this.op++] = m_off << 2;
                 this.out[this.op++] = m_off >> 6;
@@ -539,29 +563,26 @@ var lzo1x = (function () {
             } else {
                 tt = t - 18;
                 this.out[this.op++] = 0;
-                while (tt > 255) {
-                    tt -= 255;
-                    this.out[this.op++] = 0;
-                }
-                this.out[this.op++] = tt;
+                this._zeroFill(tt);
             }
 
-            do {
-                this.out[this.op++] = this.buf[this.ii++];
-            } while (--t > 0);
+            this.comp_copy_from_buf(t);
 	    },
 
 	    compress: function (state) {
 	        this.state = state;
-	        this.ip = 0;
+	        this.state.outputBuffer = new Uint8Array(this.buf.length + Math.ceil(this.buf.length / 16) + 64 + 3);
+
 	        this.buf = this.state.inputBuffer;
-	        var in_len = this.buf.length;
-	        var max_len = in_len + Math.ceil(in_len / 16) + 64 + 3;
-	        this.state.outputBuffer = new Uint8Array(max_len);
+			this.buf32 = this._get4ByteAlignedBuf(this.buf);
+
 	        this.out = this.state.outputBuffer;
+			this.out32 = this._get4ByteAlignedBuf(this.out);
+
+	        this.ip = 0;
 	        this.op = 0;
-	        this.dict = new Uint32Array(16384);
-	        var l = in_len;
+
+	        var l = this.buf.length;
 	        var t = 0;
 
 	        while (l > 20) {
