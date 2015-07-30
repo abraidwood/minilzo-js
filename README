@@ -27,8 +27,13 @@ Functions modify state.outputBuffer to contain a UInt8Array containing compresse
 
 Performance
 -----------
-I have achieved 30-40MByte/s decompression and compression in Chrome 44 on my 2.5GHz i5 (IvyBridge) macbook pro.
+Using ~25,000 test files, I see the following averaged performance on my 2.5GHz i5 (IvyBridge) macbook pro.
+
+Chrome 44: compress 40MByte/s, decompress 50MByte/s
+Firefox 41.0a2: compress 28MByte/s, decompress 23MByte/s
+Safari 8: compress 39MByte/s, decompress 50MByte/s
 
 Testing
 -------
 Although tests are not present in this repo, I have tested compression and decompression separately using the output of the compiled minilzo.c (2.09) distribution.  The tests ran using ~25,000 files and all passed.
+
