@@ -613,8 +613,8 @@ var lzo1x = (function () {
 
 	return {
 		version: version,
-		compress: _lzo1x.compress(state),
-		decompress: _lzo1x.decompress(state),
+		compress: _lzo1x.compress.bind(_lzo1x),
+		decompress: _lzo1x.decompress.bind(_lzo1x),
 		codes: {
 			OK: _lzo1x.OK,
 			INPUT_OVERRUN: _lzo1x.INPUT_OVERRUN,
