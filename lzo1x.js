@@ -337,6 +337,7 @@ var lzo1x = (function () {
 
 	                this.t += 3;
 	                this.copy_from_buf();
+	            } else {
 	                this.skipToFirstLiteralFun = false;
 	            }
 
@@ -354,7 +355,7 @@ var lzo1x = (function () {
 	                this.out[this.op++] = this.out[this.m_pos];
 
 	                if(this.match_done() === 0) {
-	                    break;
+	                    continue;
 	                } else {
 	                    this.match_next();
 	                    continue;
