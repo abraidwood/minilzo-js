@@ -92,6 +92,17 @@ var lzo1x = (function () {
 	        return c;
 	    },
 
+		_get4ByteAlignedBuf: function(buf) {
+	    	if(buf.length % 4 === 0) {
+	    		return new Uint32Array(buf.buffer);
+
+			} else {
+				var buf_4b = new Uint8Array(buf.length + (4 - buf.length % 4));
+				buf_4b.set(buf);
+				return new Uint32Array(buf_4b.buffer);
+			}
+	    },
+
 	    extendBuffer: function() {
 	        var newBuffer = new Uint8Array(this.cbl + this.blockSize);
 	        newBuffer.set(this.out);
@@ -274,9 +285,7 @@ var lzo1x = (function () {
 	        this.state = state;
 
 	        this.buf = this.state.inputBuffer;
-	        var buf_4b = new Uint8Array(this.buf.length + (4 - this.buf.length % 4));
-	        buf_4b.set(this.buf);
-	        this.buf32 = new Uint32Array(buf_4b.buffer);
+			this.buf32 = this._get4ByteAlignedBuf(this.buf);
 
 	        this.out = new Uint8Array(this.buf.length + (this.blockSize - this.buf.length % this.blockSize));
 	        this.out32 = new Uint32Array(this.out.buffer);
@@ -516,13 +525,11 @@ var lzo1x = (function () {
 	        this.state = state;
 	        this.ip = 0;
 	        this.buf = this.state.inputBuffer;
-	        var in_len = this.buf.length;
-	        var max_len = in_len + Math.ceil(in_len / 16) + 64 + 3;
-	        this.state.outputBuffer = new Uint8Array(max_len);
+	        this.state.outputBuffer = new Uint8Array(this.buf.length + Math.ceil(this.buf.length / 16) + 64 + 3);
 	        this.out = this.state.outputBuffer;
 	        this.op = 0;
 	        this.dict = new Uint32Array(16384);
-	        var l = in_len;
+	        var l = this.buf.length;
 	        var t = 0;
 
 	        while (l > 20) {
@@ -541,7 +548,7 @@ var lzo1x = (function () {
 	        t += l;
 
 	        if (t > 0) {
-	            var ii = in_len - t;
+	            var ii = this.buf.length - t;
 
 	            if (this.op === 0 && t <= 238) {
 	                this.out[this.op++] = 17 + t;
