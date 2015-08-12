@@ -511,10 +511,13 @@ var lzo1x = (function () {
 	        this.state = state;
 	        this.ip = 0;
 	        this.buf = this.state.inputBuffer;
-	        this.state.outputBuffer = new Uint8Array(this.buf.length + Math.ceil(this.buf.length / 16) + 64 + 3);
-	        this.out = this.state.outputBuffer;
+	        var maxSize = this.buf.length + Math.ceil(this.buf.length / 16) + 64 + 3;
+	        if(maxSize > this.out.length) {
+	        	this.out = new Uint8Array(maxSize);
+	        }
+	        // this.state.outputBuffer = new Uint8Array(this.buf.length + Math.ceil(this.buf.length / 16) + 64 + 3);
+	        // this.out = this.state.outputBuffer;
 	        this.op = 0;
-	        this.dict = new Uint32Array(16384);
 	        var l = this.buf.length;
 	        var t = 0;
 
