@@ -29,34 +29,33 @@
  */
 
 var lzo1x = (function () {
-	function _lzo1x() {}
+	function _lzo1x() {
+		this.blockSize = 4096;
+		this.minNewSize = this.blockSize;
 
-	_lzo1x.prototype = {
-		blockSize: 4096,
+		this.OK = 0;
+		this.INPUT_OVERRUN = -4;
+		this.OUTPUT_OVERRUN = -5;
+		this.LOOKBEHIND_OVERRUN = -6;
+		this.EOF_FOUND = -999;
 
-		OK: 0,
-		INPUT_OVERRUN: -4,
-		OUTPUT_OVERRUN: -5,
-		LOOKBEHIND_OVERRUN: -6,
-		EOF_FOUND: -999,
+		this.buf = null;
+		this.buf32 = null;
 
-		buf: null,
-		buf32: null,
+		this.out = null;
+		this.out32 = null;
+		this.cbl = 0;
+		this.ip_end = 0;
+		this.op_end = 0;
+		this.t = 0;
 
-		out: null,
-		out32: null,
-		cbl: 0,
-		ip_end: 0,
-		op_end: 0,
-		t: 0,
+		this.ip = 0;
+		this.op = 0;
+		this.m_pos = 0;
 
-		ip: 0,
-		op: 0,
-		m_pos: 0,
+		this.skipToFirstLiteralFun = false;
 
-		skipToFirstLiteralFun: false,
-
-		ctzl: function(v) {
+		this.ctzl = function(v) {
 			// this might be needed for _compressCore (it isn't in my current test files)
 	        /*
 	         * https://graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightBinSearch
@@ -90,9 +89,9 @@ var lzo1x = (function () {
 	            c -= v & 0x1;
 	        }
 	        return c;
-	    },
+	    };
 
-		_get4ByteAlignedBuf: function(buf) {
+		this._get4ByteAlignedBuf = function(buf) {
 	    	if(buf.length % 4 === 0) {
 	    		return new Uint32Array(buf.buffer);
 
@@ -101,28 +100,29 @@ var lzo1x = (function () {
 				buf_4b.set(buf);
 				return new Uint32Array(buf_4b.buffer);
 			}
-	    },
+	    };
 
-	    extendBuffer: function() {
-	        var newBuffer = new Uint8Array(this.cbl + this.blockSize);
+	    this.extendBuffer = function() {
+	        var newBuffer = new Uint8Array(this.minNewSize + (this.blockSize - this.minNewSize % this.blockSize));
 	        newBuffer.set(this.out);
 	        this.out = newBuffer;
 	        this.out32 = new Uint32Array(this.out.buffer);
 	        this.state.outputBuffer = this.out;
 	        this.cbl = this.out.length;
-	    },
+	    };
 
 
-	    eof_found: function() {
+	    this.eof_found = function() {
 	        // *out_len = ((lzo_uint) ((op)-(out)));
 	        return (this.ip === this.ip_end ? 0 : (this.ip < this.ip_end ? -8 : -4));
-	    },
+	    };
 
-	    match_next: function() {
+	    this.match_next = function() {
 	        // if (op_end - op < t) return OUTPUT_OVERRUN;
 	        // if (ip_end - ip < t+3) return INPUT_OVERRUN;
 
-	        while(this.op + 3 > this.cbl) {this.extendBuffer();}
+	        this.minNewSize = this.op + 3;
+	        if(this.minNewSize > this.cbl) {this.extendBuffer();}
 
 	        this.out[this.op++] = this.buf[this.ip++];
 	        if (this.t > 1) {
@@ -133,16 +133,18 @@ var lzo1x = (function () {
 	        }
 
 	        this.t = this.buf[this.ip++];
-	    },
+	    };
 
-	    match_done: function() {
+	    this.match_done = function() {
 	        this.t = this.buf[this.ip-2] & 3;
 	        return this.t;
-	    },
+	    };
 
-	    copy_match: function() {
+	    this.copy_match = function() {
 	        this.t += 2;
-	        while(this.op + this.t > this.cbl) {this.extendBuffer();}
+
+	        this.minNewSize = this.op + this.t;
+	        if(this.minNewSize > this.cbl) {this.extendBuffer();}
 
 	        if(this.t > 4 && this.op % 4 === this.m_pos % 4) {
 	            while (this.op % 4 > 0) {
@@ -160,10 +162,11 @@ var lzo1x = (function () {
 	        do {
 	            this.out[this.op++] = this.out[this.m_pos++];
 	        } while(--this.t > 0);
-	    },
+	    };
 
-	    copy_from_buf: function() {
-	        while(this.op + this.t > this.cbl) {this.extendBuffer();}
+	    this.copy_from_buf = function() {
+	    	this.minNewSize = this.op + this.t;
+	        if(this.minNewSize > this.cbl) {this.extendBuffer();}
 
 	        if(this.t > 4 && this.op % 4 === this.ip % 4) {
 	            while (this.op % 4 > 0) {
@@ -181,9 +184,9 @@ var lzo1x = (function () {
 	        do {
 	            this.out[this.op++] = this.buf[this.ip++];
 	        } while (--this.t > 0);
-	    },
+	    };
 
-	    match: function() {
+	    this.match = function() {
 	        for (;;) {
 	            if (this.t >= 64) {
 
@@ -254,7 +257,8 @@ var lzo1x = (function () {
 
 	                // if (m_pos < out || m_pos >= op) return LOOKBEHIND_OVERRUN;
 	                // if (op_end - op < 2) return OUTPUT_OVERRUN;
-	                while(this.op + 2 > this.cbl) {this.extendBuffer();}
+	                this.minNewSize = this.op + 2;
+	                if(this.minNewSize > this.cbl) {this.extendBuffer();}
 	                this.out[this.op++] = this.out[this.m_pos++];
 	                this.out[this.op++] = this.out[this.m_pos];
 
@@ -279,9 +283,9 @@ var lzo1x = (function () {
 	        }
 
 	        return this.OK;
-	    },
+	    };
 
-	    decompress: function(state) {
+	    this.decompress = function(state) {
 	        this.state = state;
 
 	        this.buf = this.state.inputBuffer;
@@ -358,7 +362,8 @@ var lzo1x = (function () {
 
 	                // if ( m_pos <  out || m_pos >= op) return LOOKBEHIND_OVERRUN;
 	                // if (op_end - op < 3) return OUTPUT_OVERRUN;
-	                while(this.op + 3 > this.cbl) {this.extendBuffer();}
+	                this.minNewSize = this.op + 3;
+	                if(this.minNewSize > this.cbl) {this.extendBuffer();}
 	                this.out[this.op++] = this.out[this.m_pos++];
 	                this.out[this.op++] = this.out[this.m_pos++];
 	                this.out[this.op++] = this.out[this.m_pos];
@@ -377,9 +382,9 @@ var lzo1x = (function () {
 	        }
 
 	        return this.OK;
-	    },
+	    };
 
-	    _compressCore: function(in_len, ti) {
+	    this._compressCore = function(in_len, ti) {
 	        var ip_start = this.ip;
 	        var ip_end = this.ip + in_len - 20;
 	        var ii = this.ip;
@@ -519,9 +524,9 @@ var lzo1x = (function () {
 	            }
 	        }
 	        return in_len - ((ii - ip_start) - ti);
-	    },
+	    };
 
-	    compress: function (state) {
+	    this.compress = function (state) {
 	        this.state = state;
 	        this.ip = 0;
 	        this.buf = this.state.inputBuffer;
