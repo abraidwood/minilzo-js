@@ -30,7 +30,7 @@
 
 var lzo1x = (function () {
 	function _lzo1x() {
-		this.blockSize = 4096;
+		this.blockSize = 128 * 1024;
 		this.minNewSize = this.blockSize;
 
 		this.OK = 0;
@@ -52,15 +52,38 @@ var lzo1x = (function () {
 		this.ip = 0;
 		this.op = 0;
 		this.m_pos = 0;
+		this.dict = new Uint32Array(16384);
+		this.emptyDict = new Uint32Array(16384);
 
 		this.skipToFirstLiteralFun = false;
 
 		this.setBlockSize = function(size) {
-			this.blockSize = size;
+			if(typeof blockSize === 'number' && !isNaN(blockSize) && parseInt(blockSize) > 0) {
+				this.blockSize = parseInt(blockSize);
+				return true;
+			} else {
+				return false;
+			}
 		};
 
 		this.setOutputSize = function(size) {
-			this.out = new Uint8Array(size);
+			if(typeof outputSize === 'number' && !isNaN(outputSize) && parseInt(outputSize) > 0) {
+				this.out = new Uint8Array(parseInt(size));
+				return true;
+			} else {
+				return false;
+			}
+		};
+
+		this.applyConfig = function(cfg) {
+			if(cfg !== undefined) {
+				if(cfg.outputSize !== undefined) {
+					instance.setOutputSize(cfg.outputSize);
+				}
+				if(cfg.blockSize !== undefined) {
+					instance.setBlockSize(cfg.blockSize);
+				}
+			}
 		};
 
 		this.ctzl = function(v) {
@@ -99,16 +122,18 @@ var lzo1x = (function () {
 	        return c;
 	    };
 
-		this._get4ByteAlignedBuf = function(buf) {
-	    	if(buf.length % 4 === 0) {
-	    		return new Uint32Array(buf.buffer);
+	    // It might be faster to copy 4 bytes at a time, but
+	    // the allocation seems to kill performance.
+		// this._get4ByteAlignedBuf = function(buf) {
+		// 	if(buf.length % 4 === 0) {
+		// 		return new Uint32Array(buf.buffer);
 
-			} else {
-				var buf_4b = new Uint8Array(buf.length + (4 - buf.length % 4));
-				buf_4b.set(buf);
-				return new Uint32Array(buf_4b.buffer);
-			}
-	    };
+		// 	} else {
+		// 		var buf_4b = new Uint8Array(buf.length + (4 - buf.length % 4));
+		// 		buf_4b.set(buf);
+		// 		return new Uint32Array(buf_4b.buffer);
+		// 	}
+		// };
 
 	    this.extendBuffer = function() {
 	        var newBuffer = new Uint8Array(this.minNewSize + (this.blockSize - this.minNewSize % this.blockSize));
@@ -119,12 +144,6 @@ var lzo1x = (function () {
 	        this.cbl = this.out.length;
 	    };
 
-
-	    this.eof_found = function() {
-	        // *out_len = ((lzo_uint) ((op)-(out)));
-	        return (this.ip === this.ip_end ? 0 : (this.ip < this.ip_end ? -8 : -4));
-	    };
-
 	    this.match_next = function() {
 	        // if (op_end - op < t) return OUTPUT_OVERRUN;
 	        // if (ip_end - ip < t+3) return INPUT_OVERRUN;
@@ -133,9 +152,9 @@ var lzo1x = (function () {
 	        if(this.minNewSize > this.cbl) {this.extendBuffer();}
 
 	        this.out[this.op++] = this.buf[this.ip++];
-	        if (this.t > 1) {
+	        if(this.t > 1) {
 	            this.out[this.op++] = this.buf[this.ip++];
-	            if (this.t > 2) {
+	            if(this.t > 2) {
 	                this.out[this.op++] = this.buf[this.ip++];
 	            }
 	        }
@@ -170,23 +189,13 @@ var lzo1x = (function () {
 	    this.match = function() {
 	        for (;;) {
 	            if (this.t >= 64) {
-
-	                this.m_pos = this.op - 1;
-	                this.m_pos -= (this.t >> 2) & 7;
-	                this.m_pos -= this.buf[this.ip++] << 3;
+	                this.m_pos = (this.op - 1) - ((this.t >> 2) & 7) - (this.buf[this.ip++] << 3);
 	                this.t = (this.t >> 5) - 1;
 
 	                // if ( m_pos < out || m_pos >= op) return LOOKBEHIND_OVERRUN;
 	                // if (op_end - op < t+3-1) return OUTPUT_OVERRUN;
 
 	                this.copy_match();
-
-	                if(this.match_done() === 0) {
-	                    break;
-	                } else {
-	                    this.match_next();
-	                    continue;
-	                }
 
 	            } else if (this.t >= 32) {
 	                this.t &= 31;
@@ -201,14 +210,13 @@ var lzo1x = (function () {
 	                    // if (ip_end - ip < 2) return INPUT_OVERRUN;
 	                }
 
-	                this.m_pos = this.op - 1;
-	                this.m_pos -= (this.buf[this.ip] >> 2) + (this.buf[this.ip + 1] << 6);
-
+	                this.m_pos = (this.op - 1) - (this.buf[this.ip] >> 2) - (this.buf[this.ip + 1] << 6);
 	                this.ip += 2;
 
+    	            this.copy_match();
+
 	            } else if (this.t >= 16) {
-	                this.m_pos = this.op;
-	                this.m_pos -= (this.t & 8) << 11;
+	                this.m_pos = this.op - ((this.t & 8) << 11);
 
 	                this.t &= 7;
 	                if (this.t === 0) {
@@ -223,63 +231,48 @@ var lzo1x = (function () {
 	                }
 
 	                this.m_pos -= (this.buf[this.ip] >> 2) + (this.buf[this.ip + 1] << 6);
-
 	                this.ip += 2;
+
 	                if (this.m_pos === this.op) {
-	                    this.state.outputBuffer = this.state.outputBuffer.subarray(0, this.op);
+	                    this.state.outputBuffer = this.out.subarray(0, this.op);
 	                    return this.EOF_FOUND;
+
+	                } else {
+	                	this.m_pos -= 0x4000;
+			            this.copy_match();
 	                }
-	                this.m_pos -= 0x4000;
 
 	            } else {
-	                this.m_pos = this.op - 1;
-	                this.m_pos -= this.t >> 2;
-	                this.m_pos -= this.buf[this.ip++] << 2;
+	                this.m_pos = (this.op - 1) - (this.t >> 2) - (this.buf[this.ip++] << 2);
 
 	                // if (m_pos < out || m_pos >= op) return LOOKBEHIND_OVERRUN;
 	                // if (op_end - op < 2) return OUTPUT_OVERRUN;
 	                this.minNewSize = this.op + 2;
 	                if(this.minNewSize > this.cbl) {this.extendBuffer();}
+
 	                this.out[this.op++] = this.out[this.m_pos++];
 	                this.out[this.op++] = this.out[this.m_pos];
-
-	                if(this.match_done() === 0) {
-	                    break;
-	                } else {
-	                    this.match_next();
-	                    continue;
-	                }
 	            }
 
 	            // if (m_pos < out || m_pos >= op) return LOOKBEHIND_OVERRUN;
 	            // if (op_end - op < t+3-1) return OUTPUT_OVERRUN;
 
-	            this.copy_match();
-
 	            if(this.match_done() === 0) {
-	                break;
+	                return this.OK;
 	            }
-
 	            this.match_next();
-	        }
-
-	        return this.OK;
+		    }
 	    };
 
 	    this.decompress = function(state) {
 	        this.state = state;
 
 	        this.buf = this.state.inputBuffer;
-			// this.buf32 = this._get4ByteAlignedBuf(this.buf);
-
-	        // this.out = new Uint8Array(this.buf.length + (this.blockSize - this.buf.length % this.blockSize));
-	        // this.out32 = new Uint32Array(this.out.buffer);
 	        this.cbl = this.out.length;
-	        this.state.outputBuffer = this.out;
 	        this.ip_end = this.buf.length;
 	        this.op_end = this.out.length;
-	        this.t = 0;
 
+	        this.t = 0;
 	        this.ip = 0;
 	        this.op = 0;
 	        this.m_pos = 0;
@@ -527,7 +520,7 @@ var lzo1x = (function () {
 	                break;
 	            }
 
-	            this.dict = new Uint32Array(16384);
+	            this.dict.set(this.emptyDict);
 
 	            var prev_ip = this.ip;
 	            t = this._compressCore(ll,t);
@@ -576,27 +569,24 @@ var lzo1x = (function () {
 
 	return {
 		setBlockSize: function(blockSize) {
-			if(typeof blockSize === 'number' && !isNaN(blockSize) && parseInt(blockSize) > 0) {
-				instance.setBlockSize(parseInt(blockSize));
-				return true;
-			} else {
-				return false;
-			}
+			return instance.setBlockSize(blockSize);
 		},
 
 		setOutputEstimate: function(outputSize) {
-			if(typeof outputSize === 'number' && !isNaN(outputSize) && parseInt(outputSize) > 0) {
-				instance.setOutputSize(parseInt(outputSize));
-				return true;
-			} else {
-				return false;
-			}
+			return instance.setOutputEstimate(outputSize);
 		},
 
-		compress: function(state) {
+		compress: function(state, cfg) {
+			if(cfg !== undefined) {
+				instance.applyConfig(cfg);
+			}
 			return instance.compress(state);
 		},
-		decompress: function(state) {
+
+		decompress: function(state, cfg) {
+			if(cfg !== undefined) {
+				instance.applyConfig(cfg);
+			}
 			return instance.decompress(state);
 		}
 	};
