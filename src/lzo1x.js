@@ -308,9 +308,8 @@ var lzo1x = (function () {
 	                        return ret === this.EOF_FOUND ? this.OK : ret;
 	                    }
 	                    continue;
-	                }
 
-	                if (this.t === 0) {
+	                } else if (this.t === 0) {
 	                    while (this.buf[this.ip] === 0) {
 	                        this.t += 255;
 	                        this.ip++;
