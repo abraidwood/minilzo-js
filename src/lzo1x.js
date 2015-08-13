@@ -370,6 +370,8 @@ var lzo1x = (function () {
 	        var dv_hi = 0;
 	        var dv_lo = 0;
 	        var dindex = 0;
+	        var t = 0;
+	        var tt = 0;
 
 
 	        this.ip += 1 + ((this.ip - ii) >> 5);
@@ -397,7 +399,7 @@ var lzo1x = (function () {
 	            }
 	            ii -= ti;
 	            ti = 0;
-	            var t = this.ip - ii;
+	            t = this.ip - ii;
 
 	            if (t !== 0) {
 	                if (t <= 3) {
@@ -411,7 +413,7 @@ var lzo1x = (function () {
 	                        this.out[this.op++] = t - 3;
 
 	                    } else {
-	                        var tt = t - 18;
+	                        tt = t - 18;
 	                        this.out[this.op++] = 0;
 	                        while (tt > 255) {
 	                            tt -= 255;
@@ -512,16 +514,19 @@ var lzo1x = (function () {
 	        this.op = 0;
 	        var l = this.buf.length;
 	        var t = 0;
+	        var ll = 0;
+	        var ii = 0;
+	        var prev_ip = 0;
 
 	        while (l > 20) {
-	            var ll = (l <= 49152) ? l : 49152;
+	            ll = (l <= 49152) ? l : 49152;
 	            if ((t + ll) >> 5 <= 0) {
 	                break;
 	            }
 
 	            this.dict.set(this.emptyDict);
 
-	            var prev_ip = this.ip;
+	            prev_ip = this.ip;
 	            t = this._compressCore(ll,t);
 	            this.ip = prev_ip + ll;
 	            l -= ll;
@@ -529,7 +534,7 @@ var lzo1x = (function () {
 	        t += l;
 
 	        if (t > 0) {
-	            var ii = this.buf.length - t;
+	            ii = this.buf.length - t;
 
 	            if (this.op === 0 && t <= 238) {
 	                this.out[this.op++] = 17 + t;
