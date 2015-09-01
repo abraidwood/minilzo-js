@@ -43,7 +43,6 @@ var lzo1x = (function () {
 		this.buf32 = null;
 
 		this.out = new Uint8Array(256 * 1024);
-		// this.out32 = new Uint32Array(this.out.buffer);
 		this.cbl = 0;
 		this.ip_end = 0;
 		this.op_end = 0;
@@ -139,8 +138,6 @@ var lzo1x = (function () {
 	        var newBuffer = new Uint8Array(this.minNewSize + (this.blockSize - this.minNewSize % this.blockSize));
 	        newBuffer.set(this.out);
 	        this.out = newBuffer;
-	        this.out32 = new Uint32Array(this.out.buffer);
-	        this.state.outputBuffer = this.out;
 	        this.cbl = this.out.length;
 	    };
 
@@ -234,7 +231,7 @@ var lzo1x = (function () {
 	                this.ip += 2;
 
 	                if (this.m_pos === this.op) {
-	                    this.state.outputBuffer = this.out.subarray(0, this.op);
+	                    this.state.outputBuffer = new Uint8Array(this.out.subarray(0, this.op));
 	                    return this.EOF_FOUND;
 
 	                } else {
@@ -270,7 +267,7 @@ var lzo1x = (function () {
 	        this.buf = this.state.inputBuffer;
 	        this.cbl = this.out.length;
 	        this.ip_end = this.buf.length;
-	        this.op_end = this.out.length;
+	        // this.op_end = this.out.length;
 
 	        this.t = 0;
 	        this.ip = 0;
@@ -564,7 +561,7 @@ var lzo1x = (function () {
 	        this.out[this.op++] = 0;
 	        this.out[this.op++] = 0;
 
-	        this.state.outputBuffer = this.out.subarray(0, this.op);
+	        this.state.outputBuffer = new Uint8Array(this.out.subarray(0, this.op));
 	        return this.OK;
 	    }
 	};
