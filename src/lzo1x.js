@@ -57,7 +57,7 @@ var lzo1x = (function () {
 
 		this.skipToFirstLiteralFun = false;
 
-		this.setBlockSize = function(size) {
+		this.setBlockSize = function(blockSize) {
 			if(typeof blockSize === 'number' && !isNaN(blockSize) && parseInt(blockSize) > 0) {
 				this.blockSize = parseInt(blockSize);
 				return true;
@@ -66,9 +66,9 @@ var lzo1x = (function () {
 			}
 		};
 
-		this.setOutputSize = function(size) {
+		this.setOutputSize = function(outputSize) {
 			if(typeof outputSize === 'number' && !isNaN(outputSize) && parseInt(outputSize) > 0) {
-				this.out = new Uint8Array(parseInt(size));
+				this.out = new Uint8Array(parseInt(outputSize));
 				return true;
 			} else {
 				return false;
@@ -577,7 +577,7 @@ var lzo1x = (function () {
 		},
 
 		setOutputEstimate: function(outputSize) {
-			return instance.setOutputEstimate(outputSize);
+			return instance.setOutputSize(outputSize);
 		},
 
 		compress: function(state, cfg) {
