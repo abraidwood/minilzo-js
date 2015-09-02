@@ -29,9 +29,9 @@ Performance
 -----------
 Using ~25,000 test files, I see the following averaged performance on my 2.5GHz i5 (IvyBridge) macbook pro.
 
-Chrome 44: compress 45MByte/s, decompress 90MByte/s
-Firefox 41.0a2: compress 45MByte/s, decompress 65MByte/s
-Safari 8: compress 50MByte/s, decompress 65MByte/s
+Chrome 45: compress 50MByte/s, decompress 77MByte/s
+Firefox 41.0a2: compress 43MByte/s, decompress 51MByte/s
+Safari 8: compress 44MByte/s, decompress 59MByte/s
 
 Testing
 -------
