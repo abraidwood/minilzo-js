@@ -29,6 +29,8 @@
  */
 
 var lzo1x = (function () {
+	'use strict';
+
 	function _lzo1x() {
 		this.blockSize = 128 * 1024;
 		this.minNewSize = this.blockSize;
@@ -276,6 +278,8 @@ var lzo1x = (function () {
 
 	        this.skipToFirstLiteralFun = false;
 
+	        var ret = 0;
+
 	        // if (ip_end - ip < 1) return INPUT_OVERRUN;
 	        if (this.buf[this.ip] > 17) {
 	            this.t = this.buf[this.ip++] - 17;
@@ -514,6 +518,7 @@ var lzo1x = (function () {
 	        var ll = 0;
 	        var ii = 0;
 	        var prev_ip = 0;
+	        var tt = 0;
 
 	        while (l > 20) {
 	            ll = (l <= 49152) ? l : 49152;
