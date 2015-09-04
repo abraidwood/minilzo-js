@@ -544,7 +544,7 @@ var lzo1x = (function () {
 	        if (this.t > 0) {
 	            this.ii = this.buf.length - this.t;
 
-	            if (this.op === 0 && t <= 238) {
+	            if (this.op === 0 && this.t <= 238) {
 	                this.out[this.op++] = 17 + this.t;
 
 	            } else if (this.t <= 3) {
