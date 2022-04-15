@@ -7,13 +7,22 @@ http://www.oberhumer.com/opensource/lzo/#minilzo
 The purpose of the library is primarily fast decompression in the browser.
 Having said that, the compression side is also quite fast.
 
+Changes in this fork
+--------------------
+
+Make the main src file `import`able. Just copy the file into your project and import the default object.
+
 Syntax
 ------
 lzo1x.compress(state);
+
+lzo1x.setOutputEstimate(outputSize);
 lzo1x.decompress(state);
 
 Parameters
 ----------
+outputSize: number
+
 state: {
 	inputBuffer: <UInt8Array>,
 	outputBuffer: null
